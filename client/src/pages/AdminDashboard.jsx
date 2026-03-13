@@ -47,13 +47,23 @@ const AdminDashboard = () => {
     setShowEmployeeModal(true);
   };
 
-  const handleDeleteEmployee = async (employeeId) => {
+  const handleDeleteEmployee = async (employeeIdentifier) => {
+    // Handle case where employeeIdentifier might be the full employee object
+    const employeeId = typeof employeeIdentifier === 'object' 
+      ? (employeeIdentifier.id || employeeIdentifier._id || employeeIdentifier.employeeId)
+      : employeeIdentifier;
+    
+    if (!employeeId) {
+      alert('Employee ID not found');
+      return;
+    }
+    
     if (window.confirm('Are you sure you want to deactivate this employee?')) {
       try {
         await api.deleteEmployee(employeeId);
         loadDashboardData(); // Refresh data
       } catch (error) {
-        alert('Failed to delete employee');
+        alert('Failed to delete employee: ' + (error.response?.data?.message || error.message));
       }
     }
   };
@@ -249,7 +259,7 @@ const AdminDashboard = () => {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDeleteEmployee(employee._id)}
+                            onClick={() => handleDeleteEmployee(employee.id || employee._id || employee.employeeId)}
                             className="text-red-600 hover:text-red-900"
                           >
                             Deactivate
