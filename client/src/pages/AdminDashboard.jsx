@@ -300,8 +300,15 @@ const AdminDashboard = () => {
                   {attendanceRecords.length > 0 ? (
                     attendanceRecords.map((record) => (
                       <tr key={record._id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {record.employeeId?.name} ({record.employeeId?.employeeId})
+                        </td> */}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {/* Fixed employee display based on actual backend response */}
+                          {record.Employee 
+                            ? `${record.Employee.name} (${record.Employee.employeeId}) - ${record.Employee.User?.username || ''}`
+                            : `Employee ID: ${record.employeeId || 'Unknown'}`
+                          }
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {moment(record.date).format('MMM DD, YYYY')}

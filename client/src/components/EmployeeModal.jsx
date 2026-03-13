@@ -66,8 +66,13 @@ const EmployeeModal = ({ employee, onClose, onSave }) => {
 
     try {
       if (employee) {
-        // Update existing employee
-        await api.updateEmployee(employee._id, formData);
+        // Update existing employee - handle missing ID
+        const employeeId = employee.id || employee._id || employee.employeeId;
+        console.log('Updating employee with ID:', employeeId); // Debug log
+        if (!employeeId) {
+          throw new Error('Employee ID not found');
+        }
+        await api.updateEmployee(employeeId, formData);
       } else {
         // Create new employee
         await api.createEmployee(formData);
