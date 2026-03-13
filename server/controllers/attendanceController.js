@@ -358,10 +358,73 @@ const getTodayStatus = async (req, res) => {
   }
 };
 
+// @desc    Mark employee as absent (manual)
+// @route   POST /api/attendance/mark-absent
+// @access  Private/Admin
+const markAbsent = async (req, res) => {
+  try {
+    const { employeeId, date } = req.body;
+    
+    if (!employeeId || !date) {
+      return res.status(400).json({ message: 'Employee ID and date are required' });
+    }
+
+    const targetDate = new Date(date);
+    targetDate.setHours(0, 0, 0, 0);
+
+    // Check if attendance record already exists for this date
+    const existingRecord = await Attendance.findOne({
+      where: {
+        employeeId,
+        date: targetDate
+      }
+    });
+
+    if (existingRecord) {
+      return res.status(400).json({ 
+        message: 'Attendance record already exists for this date' 
+      });
+    }
+
+    // Create absent record
+    const absentRecord = await Attendance.create({
+      employeeId,
+      date: targetDate,
+      checkIn: null,
+      checkOut: null,
+      status: 'absent',
+      lateMinutes: 0
+    });
+
+    // Include employee info
+    const recordWithEmployee = await Attendance.findByPk(absentRecord.id, {
+      include: [{
+        model: Employee,
+        attributes: ['name', 'employeeId', 'department', 'role'],
+        include: [{
+          model: User,
+          attributes: ['username']
+        }]
+      }]
+    });
+
+    res.json({
+      success: true,
+      message: 'Employee marked as absent successfully',
+      data: recordWithEmployee
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   checkIn,
   checkOut,
   getAttendance,
   getReport,
-  getTodayStatus
+  getTodayStatus,
+  markAbsent
 };
