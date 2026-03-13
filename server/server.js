@@ -3,12 +3,16 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const rateLimit = require('express-rate-limit');
 const { connectDB } = require('./config/db');
+const { scheduleAbsentMarking } = require('./jobs/attendanceJob');
 
 // Load env vars
 dotenv.config();
 
 // Connect to database
 connectDB();
+
+// Start scheduled jobs
+scheduleAbsentMarking();
 
 const app = express();
 

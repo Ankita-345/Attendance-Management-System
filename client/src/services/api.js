@@ -119,6 +119,11 @@ class ApiService {
     const response = await this.api.get('/attendance/report', { params });
     return response.data;
   }
+
+  async markAbsent(employeeId, date) {
+    const response = await this.api.post('/attendance/mark-absent', { employeeId, date });
+    return response.data;
+  }
 }
 
 const api = new ApiService();

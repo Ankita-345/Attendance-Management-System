@@ -6,10 +6,16 @@ import EmployeeModal from '../components/EmployeeModal';
 
 const AdminDashboard = () => {
   const [employees, setEmployees] = useState([]);
+  const [filteredEmployees, setFilteredEmployees] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [filteredAttendance, setFilteredAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [attendanceFilter, setAttendanceFilter] = useState('all'); // 'all', 'today', 'month'
+  const [selectedEmployee, setSelectedEmployee] = useState('');
+  const [markingAbsent, setMarkingAbsent] = useState({});
 
   useEffect(() => {
     loadDashboardData();
@@ -22,13 +28,15 @@ const AdminDashboard = () => {
       // Load employees
       const employeesResponse = await api.getEmployees();
       setEmployees(employeesResponse.data);
+      setFilteredEmployees(employeesResponse.data); // Initialize filtered list
 
       // Load recent attendance records
       const attendanceResponse = await api.getAttendance({
-        startDate: moment().subtract(7, 'days').format('YYYY-MM-DD'),
+        startDate: moment().subtract(30, 'days').format('YYYY-MM-DD'),
         endDate: moment().format('YYYY-MM-DD')
       });
-      setAttendanceRecords(attendanceResponse.data.slice(0, 20)); // Last 20 records
+      setAttendanceRecords(attendanceResponse.data);
+      setFilteredAttendance(attendanceResponse.data); // Initialize filtered attendance
       
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -36,6 +44,53 @@ const AdminDashboard = () => {
       setLoading(false);
     }
   };
+
+  // Search/filter employees
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredEmployees(employees);
+      return;
+    }
+
+    const filtered = employees.filter(employee => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        employee.name?.toLowerCase().includes(searchLower) ||
+        employee.employeeId?.toLowerCase().includes(searchLower) ||
+        employee.department?.toLowerCase().includes(searchLower) ||
+        employee.email?.toLowerCase().includes(searchLower) ||
+        employee.role?.toLowerCase().includes(searchLower)
+      );
+    });
+
+    setFilteredEmployees(filtered);
+  }, [searchTerm, employees]);
+
+  // Attendance filtering logic
+  useEffect(() => {
+    let filtered = [...attendanceRecords];
+
+    // Apply employee filter
+    if (selectedEmployee) {
+      filtered = filtered.filter(record => 
+        record.Employee?.employeeId === selectedEmployee
+      );
+    }
+
+    // Apply time filter
+    const now = moment();
+    if (attendanceFilter === 'today') {
+      filtered = filtered.filter(record => 
+        moment(record.date).isSame(now, 'day')
+      );
+    } else if (attendanceFilter === 'month') {
+      filtered = filtered.filter(record => 
+        moment(record.date).isSame(now, 'month')
+      );
+    }
+
+    setFilteredAttendance(filtered);
+  }, [attendanceRecords, attendanceFilter, selectedEmployee]);
 
   const handleAddEmployee = () => {
     setEditingEmployee(null);
@@ -65,6 +120,22 @@ const AdminDashboard = () => {
       } catch (error) {
         alert('Failed to delete employee: ' + (error.response?.data?.message || error.message));
       }
+    }
+  };
+
+  const handleMarkAbsent = async (employeeId, date = new Date().toISOString().split('T')[0]) => {
+    const key = `${employeeId}-${date}`;
+    setMarkingAbsent(prev => ({ ...prev, [key]: true }));
+    
+    try {
+      await api.markAbsent(employeeId, date);
+      // Refresh attendance data
+      loadDashboardData();
+      alert('Employee marked as absent successfully');
+    } catch (error) {
+      alert('Failed to mark absent: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setMarkingAbsent(prev => ({ ...prev, [key]: false }));
     }
   };
 
@@ -143,7 +214,14 @@ const AdminDashboard = () => {
                     <dl>
                       <dt className="text-sm font-medium text-gray-500 truncate">Total Employees</dt>
                       <dd className="flex items-baseline">
-                        <div className="text-2xl font-semibold text-gray-900">{employees.length}</div>
+                        <div className="text-2xl font-semibold text-gray-900">
+                          {employees.length}
+                          {searchTerm && (
+                            <span className="text-sm text-gray-500 ml-2">
+                              ({filteredEmployees.length} filtered)
+                            </span>
+                          )}
+                        </div>
                       </dd>
                     </dl>
                   </div>
@@ -206,8 +284,33 @@ const AdminDashboard = () => {
         {/* Employee Management Section */}
         <div className="px-4 pb-6 sm:px-0">
           <div className="card">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900">Employee Management</h2>
+              <div className="mt-4 sm:mt-0 flex space-x-3">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search employees..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-2 w-64 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base font-normal"
+                  />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+                <button
+                  onClick={handleAddEmployee}
+                  className="btn-primary flex items-center"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add Employee
+                </button>
+              </div>
             </div>
             
             <div className="overflow-hidden">
@@ -232,9 +335,9 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {employees.length > 0 ? (
-                    employees.map((employee) => (
-                      <tr key={employee._id}>
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((employee) => (
+                      <tr key={employee.id || employee._id || employee.employeeId}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
                             <div className="text-sm font-medium text-gray-900">{employee.name}</div>
@@ -260,9 +363,22 @@ const AdminDashboard = () => {
                           </button>
                           <button
                             onClick={() => handleDeleteEmployee(employee.id || employee._id || employee.employeeId)}
-                            className="text-red-600 hover:text-red-900"
+                            className="text-red-600 hover:text-red-900 mr-4"
                           >
                             Deactivate
+                          </button>
+                          <button
+                            onClick={() => handleMarkAbsent(employee.id || employee._id || employee.employeeId)}
+                            disabled={markingAbsent[`${employee.id || employee._id || employee.employeeId}-${new Date().toISOString().split('T')[0]}`]}
+                            className={`${
+                              markingAbsent[`${employee.id || employee._id || employee.employeeId}-${new Date().toISOString().split('T')[0]}`]
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-orange-600 hover:bg-orange-700 text-white'
+                            } px-3 py-1 rounded text-xs font-medium transition duration-200`}
+                          >
+                            {markingAbsent[`${employee.id || employee._id || employee.employeeId}-${new Date().toISOString().split('T')[0]}`] 
+                              ? 'Marking...' 
+                              : 'Mark Absent'}
                           </button>
                         </td>
                       </tr>
@@ -270,7 +386,7 @@ const AdminDashboard = () => {
                   ) : (
                     <tr>
                       <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
-                        No employees found
+                        {searchTerm ? 'No employees found matching your search' : 'No employees found'}
                       </td>
                     </tr>
                   )}
@@ -283,7 +399,41 @@ const AdminDashboard = () => {
         {/* Recent Attendance Records */}
         <div className="px-4 sm:px-0">
           <div className="card">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Attendance Records</h2>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4">
+              <h2 className="text-lg font-medium text-gray-900">Recent Attendance Records</h2>
+              <div className="mt-4 sm:mt-0 flex flex-wrap gap-3">
+                {/* Time Filter */}
+                <div className="flex space-x-2">
+                  <span className="text-sm text-gray-600 self-center">Filter:</span>
+                  <select
+                    value={attendanceFilter}
+                    onChange={(e) => setAttendanceFilter(e.target.value)}
+                    className="input-field text-sm py-1"
+                  >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="month">This Month</option>
+                  </select>
+                </div>
+                
+                {/* Employee Filter */}
+                <div className="flex space-x-2">
+                  <span className="text-sm text-gray-600 self-center">Employee:</span>
+                  <select
+                    value={selectedEmployee}
+                    onChange={(e) => setSelectedEmployee(e.target.value)}
+                    className="input-field text-sm py-1"
+                  >
+                    <option value="">All Employees</option>
+                    {employees.map(emp => (
+                      <option key={emp.employeeId} value={emp.employeeId}>
+                        {emp.name} ({emp.employeeId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
             
             <div className="overflow-hidden">
               <table className="min-w-full divide-y divide-gray-200">
@@ -307,12 +457,9 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {attendanceRecords.length > 0 ? (
-                    attendanceRecords.map((record) => (
-                      <tr key={record._id}>
-                        {/* <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {record.employeeId?.name} ({record.employeeId?.employeeId})
-                        </td> */}
+                  {filteredAttendance.length > 0 ? (
+                    filteredAttendance.slice(0, 20).map((record) => (
+                      <tr key={record.id}>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {/* Fixed employee display based on actual backend response */}
                           {record.Employee 
@@ -337,7 +484,14 @@ const AdminDashboard = () => {
                   ) : (
                     <tr>
                       <td colSpan="5" className="px-6 py-4 text-center text-sm text-gray-500">
-                        No attendance records found
+                        {attendanceFilter === 'today' 
+                          ? 'No attendance records for today' 
+                          : attendanceFilter === 'month'
+                          ? 'No attendance records for this month'
+                          : selectedEmployee
+                          ? `No attendance records for ${employees.find(e => e.employeeId === selectedEmployee)?.name || selectedEmployee}`
+                          : 'No attendance records found'
+                        }
                       </td>
                     </tr>
                   )}
