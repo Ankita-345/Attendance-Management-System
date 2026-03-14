@@ -18,8 +18,7 @@ const Employee = sequelize.define('Employee', {
   },
   employeeId: {
     type: DataTypes.STRING,
-    allowNull: false,
-    unique: true
+    allowNull: false
   },
   name: {
     type: DataTypes.STRING,
@@ -28,7 +27,6 @@ const Employee = sequelize.define('Employee', {
   email: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
     validate: {
       isEmail: true
     }
@@ -51,7 +49,17 @@ const Employee = sequelize.define('Employee', {
   }
 }, {
   timestamps: true,
-  tableName: 'employees'
+  tableName: 'employees',
+  indexes: [
+    {
+      unique: true,
+      fields: ['employeeId']
+    },
+    {
+      unique: true,
+      fields: ['email']
+    }
+  ]
 });
 
 // Associations
